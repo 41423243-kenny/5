@@ -3,210 +3,192 @@
 {% block title %}Brython 遊戲{% endblock %}
 
 {% block content %}
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.11.3/brython.min.js"></script>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/brython@3.11.3/brython_stdlib.js"></script>
-    
-    <body onload="brython(1)"> 
+<script src="https://cdn.jsdelivr.net/npm/brython@3.11.3/brython.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/brython@3.11.3/brython_stdlib.js"></script>
 
-    <h2 style="text-align: center;">🕹️ 點擊測試：點擊移動中的圓形！</h2>
+<h2 style="text-align: center;">🕹️ 點擊測試：點擊移動中的圓形！</h2>
 
-    <div id="brython_div1" style="width: 600px; height: 400px; margin: 20px auto;">
-    </div>
+<div id="brython_div1" style="width: 600px; height: 400px; margin: 20px auto;"></div>
 
-    {# 使用 {% raw %} 塊，確保 Jinja2 不會解析 Brython 程式碼中的大括號和 f-string #}
-    {% raw %} 
-    <script type="text/python">
-        from browser import document, timer, window, ajax
-        import random
-        import time
+{% raw %}
+<script type="text/python">
+from browser import document, timer, window
+import random
+import time
 
-        # --- 遊戲設定 ---
-        GAME_DURATION = 30 
-        score = 0
-        game_active = False
+# =========================
+# 遊戲設定
+# =========================
+GAME_DURATION = 30
+TARGET_SIZE = 50
+MOVE_INTERVAL = 800
 
-        # --- 獲取 DOM 元素及初始化 ---
-        game_area = document["brython_div1"]
-        game_area.style.border = "3px solid #333"
-        game_area.style.backgroundColor = "#e0e0ff"
-        game_area.style.position = "relative"
-        game_area.style.overflow = "hidden"
-        game_area.style.cursor = "crosshair"
+score = 0
+game_active = False
+targets = []
 
-        # 創建分數和時間顯示區
-        score_display = document.createElement("div")
-        score_display.style.position = "absolute"
-        score_display.style.top = "10px"
-        score_display.style.left = "10px"
-        score_display.style.fontSize = "1.2em"
-        score_display.style.fontWeight = "bold"
-        score_display.style.backgroundColor = "rgba(255, 255, 255, 0.7)"
-        score_display.style.padding = "5px"
-        game_area <= score_display
+# =========================
+# 遊戲區設定
+# =========================
+game_area = document["brython_div1"]
+game_area.style.border = "3px solid #333"
+game_area.style.backgroundColor = "#e0e0ff"
+game_area.style.position = "relative"
+game_area.style.overflow = "hidden"
+game_area.style.cursor = "crosshair"
 
-        timer_display = document.createElement("div")
-        timer_display.style.position = "absolute"
-        timer_display.style.top = "10px"
-        timer_display.style.right = "10px"
-        timer_display.style.fontSize = "1.2em"
-        timer_display.style.fontWeight = "bold"
-        timer_display.style.backgroundColor = "rgba(255, 255, 255, 0.7)"
-        timer_display.style.padding = "5px"
-        game_area <= timer_display
+# =========================
+# 分數顯示
+# =========================
+score_display = document.createElement("div")
+score_display.style.position = "absolute"
+score_display.style.top = "10px"
+score_display.style.left = "10px"
+score_display.style.fontSize = "1.2em"
+score_display.style.fontWeight = "bold"
+game_area <= score_display
 
-        # 創建目標元素
+# =========================
+# 時間顯示
+# =========================
+timer_display = document.createElement("div")
+timer_display.style.position = "absolute"
+timer_display.style.top = "10px"
+timer_display.style.right = "10px"
+timer_display.style.fontSize = "1.2em"
+timer_display.style.fontWeight = "bold"
+game_area <= timer_display
+
+# =========================
+# 使用者輸入（圓點數量）
+# =========================
+input_box = document.createElement("input")
+input_box.type = "number"
+input_box.value = "3"
+input_box.min = "1"
+input_box.style.position = "absolute"
+input_box.style.bottom = "10px"
+input_box.style.left = "10px"
+game_area <= input_box
+
+label = document.createElement("span")
+label.text = " 圓點數量"
+label.style.position = "absolute"
+label.style.bottom = "12px"
+label.style.left = "70px"
+game_area <= label
+
+# =========================
+# 建立圓點
+# =========================
+def create_targets():
+    global targets
+
+    # 清除舊圓點
+    for t in targets:
+        t.remove()
+    targets.clear()
+
+    # 防呆處理
+    try:
+        count = max(1, int(input_box.value))
+    except:
+        count = 1
+
+    for _ in range(count):
         target = document.createElement("div")
-        target.id = "target"
-        target.style.width = "50px"
-        target.style.height = "50px"
-        target.style.backgroundColor = "#ff4500"
-        target.style.position = "absolute"
+        target.style.width = f"{TARGET_SIZE}px"
+        target.style.height = f"{TARGET_SIZE}px"
         target.style.borderRadius = "50%"
+        target.style.position = "absolute"
         target.style.cursor = "pointer"
-        target.style.transition = "background-color 0.1s, top 0.3s, left 0.3s"
-        game_area <= target
-
-        # 創建遊戲結束訊息
-        game_over_msg = document.createElement("div")
-        game_over_msg.style.position = "absolute"
-        game_over_msg.style.top = "50%"
-        game_over_msg.style.left = "50%"
-        game_over_msg.style.transform = "translate(-50%, -50%)"
-        game_over_msg.style.backgroundColor = "rgba(0, 0, 0, 0.9)"
-        game_over_msg.style.color = "white"
-        game_over_msg.style.padding = "30px"
-        game_over_msg.style.borderRadius = "10px"
-        game_over_msg.style.fontSize = "2em"
-        game_over_msg.style.zIndex = "100"
-        game_over_msg.style.display = "none"
-        game_over_msg.style.textAlign = "center"
-        game_area <= game_over_msg
-
-        # --- 遊戲核心邏輯 ---
-
-        def move_target():
-            """移動目標元素"""
-            if not game_active:
-                return
-            
-            max_x = game_area.clientWidth - 50
-            max_y = game_area.clientHeight - 50
-            min_y = 40 
-
-            new_x = random.randint(0, max(0, max_x))
-            new_y = random.randint(min_y, max(min_y, max_y))
-            
-            target.style.backgroundColor = f"rgb({random.randint(0, 255)}, {random.randint(0, 255)}, {random.randint(0, 255)})"
-            
-            target.style.left = f"{new_x}px"
-            target.style.top = f"{new_y}px"
+        target.style.backgroundColor = "red"
 
         @target.bind("click")
-        def hit_target(event):
-            """點擊目標時觸發 (已經是「點擊圓圈內」的檢測)"""
+        def hit(ev):
             global score
             if not game_active:
                 return
-
             score += 1
             score_display.text = f"分數: {score}"
-            move_target()
-            event.stopPropagation() 
+            move_targets()
+            ev.stopPropagation()
 
-        def submit_score_to_server(final_score):
-            """使用 Brython 的 ajax 模組提交分數到 Flask 後端"""
-            def on_complete(req):
-                if req.status == 200:
-                    window.alert("分數成功上傳至英雄榜！")
-                else:
-                    # 顯示後端返回的錯誤訊息
-                    try:
-                        resp = window.JSON.parse(req.text)
-                        msg = resp.message
-                    except:
-                        msg = "請檢查登入狀態或伺服器狀態，或確保您已登入。"
-                    window.alert(f"分數上傳失敗 ({req.status})！{msg}")
-            
-            req = ajax.ajax()
-            req.bind('complete', on_complete)
-            
-            # **將 Jinja2 語法放在 raw 塊外，再繼續 raw 塊**
-            # 必須使用 {% endraw %}{% raw %} 分割，才能呼叫 url_for
-            {% endraw %}
-            req.open('POST', '{{ url_for("submit_score") }}', True) 
-            {% raw %}
-            
-            req.set_header('Content-Type', 'application/json')
-            
-            # 關鍵修正：使用 Brython 內建的 JSON 序列化功能，最安全！
-            data = {'score': final_score}
-            json_payload = window.JSON.stringify(data)
-            
-            req.send(json_payload)
+        game_area <= target
+        targets.append(target)
 
-        def restart_game(event):
-            # ... (重新開始邏輯不變)
-            game_over_msg.style.display = "none"
-            start_game()
-            event.stopPropagation()
+# =========================
+# 移動圓點
+# =========================
+def move_targets():
+    if not game_active:
+        return
 
-        def check_time():
-            # ... (檢查時間邏輯不變)
-            global game_active
-            
-            game_over_time_diff = game_over_time - time.time()
-            remaining = int(game_over_time_diff)
-            
-            if remaining <= 0:
-                timer_display.text = "時間: 0s"
-                if game_active:
-                    game_active = False
-                    
-                    # 遊戲結束後提交分數
-                    submit_score_to_server(score) 
-                    
-                    # 顯示結束訊息
-                    game_over_msg.innerHTML = f"遊戲結束！<br>最終分數: {score}"
-                    
-                    restart_btn = document.createElement("button")
-                    restart_btn.text = "重新開始"
-                    restart_btn.style.marginTop = "15px"
-                    restart_btn.style.padding = "10px 20px"
-                    restart_btn.style.fontSize = "0.7em"
-                    restart_btn.style.cursor = "pointer"
-                    restart_btn.bind("click", restart_game)
-                    
-                    game_over_msg <= document.createElement("br")
-                    game_over_msg <= restart_btn
-                    game_over_msg.style.display = "block"
-                    
-                    timer.clear_interval(move_interval_handle)
-                    
-            else:
-                timer_display.text = f"時間: {remaining}s"
-                timer.set_timeout(check_time, 1000)
+    max_x = game_area.clientWidth - TARGET_SIZE
+    max_y = game_area.clientHeight - TARGET_SIZE
 
-        # --- 遊戲啟動函數 ---
-        def start_game():
-            # ... (啟動邏輯不變)
-            global game_active, game_over_time, move_interval_handle, score
-            
-            score = 0
-            game_active = True
-            score_display.text = "分數: 0"
-            timer_display.text = f"時間: {GAME_DURATION}s"
-            
-            game_over_time = time.time() + GAME_DURATION
-            
-            check_time()
-            move_target()
-            move_interval_handle = timer.set_interval(move_target, 800) 
-            
-        # 啟動遊戲
-        start_game()
+    for t in targets:
+        t.style.left = f"{random.randint(0, max_x)}px"
+        t.style.top = f"{random.randint(40, max_y)}px"
+        t.style.backgroundColor = (
+            f"rgb({random.randint(0,255)},"
+            f"{random.randint(0,255)},"
+            f"{random.randint(0,255)})"
+        )
 
-    </script>
-    {% endraw %}
-    
-    </body>
+# =========================
+# 即時更新圓點數量（⭐ 關鍵修正）
+# =========================
+@input_box.bind("change")
+def update_targets(ev):
+    if game_active:
+        create_targets()
+        move_targets()
+
+# =========================
+# 計時檢查
+# =========================
+def check_time():
+    global game_active
+    remaining = int(game_over_time - time.time())
+
+    if remaining <= 0:
+        timer_display.text = "時間: 0s"
+        game_active = False
+        timer.clear_interval(move_handle)
+
+        # 禁止再點擊
+        for t in targets:
+            t.style.pointerEvents = "none"
+
+        window.alert(f"遊戲結束！分數：{score}")
+    else:
+        timer_display.text = f"時間: {remaining}s"
+        timer.set_timeout(check_time, 1000)
+
+# =========================
+# 啟動遊戲
+# =========================
+def start_game():
+    global score, game_active, game_over_time, move_handle
+
+    score = 0
+    game_active = True
+    score_display.text = "分數: 0"
+    timer_display.text = f"時間: {GAME_DURATION}s"
+
+    create_targets()
+    move_targets()
+
+    game_over_time = time.time() + GAME_DURATION
+    check_time()
+    move_handle = timer.set_interval(move_targets, MOVE_INTERVAL)
+
+start_game()
+</script>
+{% endraw %}
+
+<script>
+  brython({debug: 1});
+</script>
 {% endblock %}

@@ -220,4 +220,4 @@ def submit_score():
         return jsonify({'success': False, 'message': 'Internal error saving score. Check server logs.'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5555)

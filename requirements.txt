@@ -1,0 +1,5 @@
+flask
+peewee
+bcrypt
+wtforms
+gunicorn
